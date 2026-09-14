@@ -31,6 +31,7 @@ target_sources(
   impl/HBM2.cpp
   impl/HBM3.cpp
   impl/HBM4.cpp
+  impl/HMC.cpp
   impl/LPDDR5.cpp
   impl/LPDDR6.cpp
   impl/GDDR6.cpp

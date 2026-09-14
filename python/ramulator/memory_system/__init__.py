@@ -5,5 +5,7 @@
 # Regenerate:   python -m ramulator codegen
 ###############################################################################
 from .generic_dram import GenericDRAM
+from .hmc import HMC
+from .hmc_network import HMCNetwork
 
-__all__ = ['GenericDRAM']
+__all__ = ['GenericDRAM', 'HMC', 'HMCNetwork']

@@ -1,6 +1,7 @@
 #ifndef RAMULATOR_BASE_REQUEST_H
 #define RAMULATOR_BASE_REQUEST_H
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <utility>
@@ -30,6 +31,13 @@ struct Request {
   int command = -1;        // Current command to issue to progress the request
   int final_command = -1;  // Terminal command needed to complete the request
   bool is_stat_updated = false;
+  int burst_remaining = 0;  // DRAM transfers still needed before completion (HMC vaults)
+  uint32_t flags = 0;
+  int hops = 0;
+
+  struct Flag {
+    enum : uint32_t { PIM = 1, PTW = 2, IdealMemNet = 4 };
+  };
 
   Clk_t arrive = -1;  // Clock cycle when the request arrives at the memory controller
   Clk_t depart = -1;  // Clock cycle when the request departs the memory controller

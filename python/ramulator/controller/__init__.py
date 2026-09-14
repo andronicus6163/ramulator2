@@ -9,8 +9,9 @@ from .gddr7 import GDDR7
 from .generic_ddr import GenericDDR
 from .hbm12 import HBM12
 from .hbm34 import HBM34
+from .hmc_vault import HMCVault
 from .lpddr5 import LPDDR5
 from .lpddr6 import LPDDR6
 from .prac import PRAC
 
-__all__ = ['BlockHammer', 'GDDR7', 'GenericDDR', 'HBM12', 'HBM34', 'LPDDR5', 'LPDDR6', 'PRAC']
+__all__ = ['BlockHammer', 'GDDR7', 'GenericDDR', 'HBM12', 'HBM34', 'HMCVault', 'LPDDR5', 'LPDDR6', 'PRAC']

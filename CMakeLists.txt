@@ -71,8 +71,10 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_library(ramulator SHARED)
+set(RAMULATOR_LIB_NAME "ramulator" CACHE STRING "Output name of the Ramulator shared library")
 set_target_properties(ramulator PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY  ${PROJECT_SOURCE_DIR}
+  OUTPUT_NAME ${RAMULATOR_LIB_NAME}
 )
 # PUBLIC so consumers of the ramulator target get the include path transitively
 target_include_directories(ramulator PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

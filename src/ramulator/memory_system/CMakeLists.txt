@@ -10,6 +10,12 @@ target_sources(
   channel_mapper/impl/passthrough_channel_mapper.cpp
 
   impl/generic_dram_system.cpp
+  impl/hmc_memory_system.cpp
+  impl/hmc_network_memory_system.cpp
+
+  network/hmc_network_queries.h
+  network/topology.h
+  network/topology.cpp
 )
 
 target_link_libraries(
@@ -17,3 +23,5 @@ target_link_libraries(
   PRIVATE
   ramulator-memorysystem
 )
+
+add_subdirectory(network)

@@ -6,10 +6,16 @@ namespace Ramulator {
 class ExternalFrontEnd : public IFrontEnd, public Implementation {
   RAMULATOR_REGISTER_IMPLEMENTATION(IFrontEnd, ExternalFrontEnd, "External")
 
+ private:
+  int m_num_cores = 1;
+
  public:
   void init() override {
     RAMULATOR_PARSE_PARAM(m_clock_ratio, unsigned int, "clock_ratio").required();
+    RAMULATOR_PARSE_PARAM(m_num_cores, int, "num_cores").default_val(1);
   }
+
+  int get_num_cores() override { return m_num_cores; }
 
   void tick() override {}
 
