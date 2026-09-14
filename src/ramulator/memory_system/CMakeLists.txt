@@ -12,6 +12,7 @@ target_sources(
   impl/generic_dram_system.cpp
   impl/hmc_memory_system.cpp
   impl/hmc_network_memory_system.cpp
+  impl/hbm_stack_memory_system.cpp
 
   network/hmc_network_queries.h
   network/topology.h

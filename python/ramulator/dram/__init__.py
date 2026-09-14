@@ -14,9 +14,10 @@ from .gddr7 import GDDR7
 from .hbm1 import HBM1
 from .hbm2 import HBM2
 from .hbm3 import HBM3
+from .hbm3e import HBM3E
 from .hbm4 import HBM4
 from .hmc import HMC
 from .lpddr5 import LPDDR5
 from .lpddr6 import LPDDR6
 
-__all__ = ['DDR3', 'DDR4', 'DDR4_VRR', 'DDR5', 'DDR5_VRR', 'GDDR6', 'GDDR7', 'HBM1', 'HBM2', 'HBM3', 'HBM4', 'HMC', 'LPDDR5', 'LPDDR6']
+__all__ = ['DDR3', 'DDR4', 'DDR4_VRR', 'DDR5', 'DDR5_VRR', 'GDDR6', 'GDDR7', 'HBM1', 'HBM2', 'HBM3', 'HBM3E', 'HBM4', 'HMC', 'LPDDR5', 'LPDDR6']
