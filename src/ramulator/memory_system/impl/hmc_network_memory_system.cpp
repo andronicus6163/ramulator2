@@ -25,7 +25,7 @@ class HMCNetworkMemorySystem final : public IMemorySystem, public Implementation
   RAMULATOR_REGISTER_IMPLEMENTATION(IMemorySystem, HMCNetworkMemorySystem, "HMCNetwork");
 
  private:
-  enum class Addressing { RoChBgBaCuVaCl, RoBgBaCuVaChCl, RoBgBaChCuVaCl, RoChBaBgCuVaCl };
+  enum class Addressing { RoChBgBaCuVaCl, RoBgBaCuVaChCl, RoBgBaChCuVaCl, RoChBaBgCuVaCl, CuVaRoChBgBaCl };
   enum IdealType { IdealLocalVault = 0, IdealLocalStack = 1 };
 
   struct Txn {
@@ -157,6 +157,9 @@ class HMCNetworkMemorySystem final : public IMemorySystem, public Implementation
       m_addressing = Addressing::RoBgBaChCuVaCl;
     } else if (m_addressing_str == "RoChBaBgCuVaCl") {
       m_addressing = Addressing::RoChBaBgCuVaCl;
+    } else if (m_addressing_str == "CuVaRoChBgBaCl") {
+      // cube and vault in the most significant bits: every vault owns one contiguous physical range
+      m_addressing = Addressing::CuVaRoChBgBaCl;
     } else {
       throw std::runtime_error(fmt::format("HMCNetwork: unknown addressing '{}'", m_addressing_str));
     }
@@ -484,9 +487,16 @@ class HMCNetworkMemorySystem final : public IMemorySystem, public Implementation
         addr_vec[m_bank_level] = slice(addr, m_bank_bits);
         column_msb = slice(addr, column_msb_bits);
         break;
+      case Addressing::CuVaRoChBgBaCl:
+        addr_vec[m_bank_level] = slice(addr, m_bank_bits);
+        addr_vec[m_bankgroup_level] = slice(addr, m_bankgroup_bits);
+        column_msb = slice(addr, column_msb_bits);
+        addr_vec[m_row_level] = slice(addr, m_row_bits);
+        vault = slice(addr, vault_bits);
+        break;
     }
     addr_vec[m_column_level] = column | (column_msb << col_low_bits);
-    addr_vec[m_row_level] = slice(addr, m_row_bits);
+    if (m_addressing != Addressing::CuVaRoChBgBaCl) addr_vec[m_row_level] = slice(addr, m_row_bits);
     addr_vec[0] = vault;
     return vault;
   }
