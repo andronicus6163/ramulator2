@@ -26,4 +26,6 @@ class HBMStack(Component):
     inter_unit = Param(str, default="host")
     inter_unit_latency_ps = Param(int, default=40000)
     inter_unit_bw_gbps = Param(float, default=12.8)
+    inter_unit_topology = Param(str, default="full")
+    inter_unit_mesh_x = Param(int, default=0)
     controllers = ChildList("controller")

@@ -29,6 +29,11 @@ namespace Ramulator {
 //   "link"             an explicit inter-unit link with a fixed traversal latency and finite bandwidth
 //                      (`inter_unit_latency_ps`, `inter_unit_bw_gbps`), as NDP systems such as SynCron
 //                      (HPCA'21 Table 5: 12.8 GB/s per direction, 40 ns per cache line) describe.
+//                      `inter_unit_topology` says how the units are wired: "full" (default) is one link per pair
+//                      of units, which is SynCron's 4-unit system; "mesh" is a 2D mesh `inter_unit_mesh_x` units
+//                      wide (units numbered row-major), routed X then Y, where every hop is one such link with its
+//                      own latency and occupancy. SynCron specifies only 4 units; the mesh is how this study grows
+//                      them (a modelling choice).
 // Either way it is a MODELLING CHOICE, counted separately in pim_remote_stack_requests.
 //
 // `source_mapping` says what a PIM source id means:
@@ -74,6 +79,9 @@ class HBMStackMemorySystem final : public IMemorySystem, public Implementation {
   std::string m_inter_unit = "host";
   int m_inter_unit_latency_ps = 40000;    // SynCron Table 5: 40 ns per cache line
   float m_inter_unit_bw_gbps = 12.8f;     // SynCron Table 5: 12.8 GB/s per direction
+  std::string m_inter_unit_topology = "full";
+  int m_inter_unit_mesh_x = 0;
+  bool m_mesh = false;
 
   Clk_t m_clk = 0;
   int m_channels = 0;
@@ -110,6 +118,7 @@ class HBMStackMemorySystem final : public IMemorySystem, public Implementation {
   size_t s_pim_remote_stack_requests = 0;
   size_t s_inter_unit_bytes = 0;
   size_t s_inter_unit_queue_ticks = 0;
+  size_t s_inter_unit_hops = 0;
   std::vector<size_t> s_requests_per_channel;
 
  public:
@@ -128,6 +137,8 @@ class HBMStackMemorySystem final : public IMemorySystem, public Implementation {
     RAMULATOR_PARSE_PARAM(m_inter_unit, std::string, "inter_unit").default_val("host");
     RAMULATOR_PARSE_PARAM(m_inter_unit_latency_ps, int, "inter_unit_latency_ps").default_val(40000);
     RAMULATOR_PARSE_PARAM(m_inter_unit_bw_gbps, float, "inter_unit_bw_gbps").default_val(12.8f);
+    RAMULATOR_PARSE_PARAM(m_inter_unit_topology, std::string, "inter_unit_topology").default_val("full");
+    RAMULATOR_PARSE_PARAM(m_inter_unit_mesh_x, int, "inter_unit_mesh_x").default_val(0);
     RAMULATOR_CREATE_CHILD_LIST(m_controllers, IController);
 
     m_channels = static_cast<int>(m_controllers.size());
@@ -156,6 +167,15 @@ class HBMStackMemorySystem final : public IMemorySystem, public Implementation {
       m_link_model = true;
     } else if (m_inter_unit != "host") {
       throw std::runtime_error("HBMStack: inter_unit must be host or link");
+    }
+    if (m_inter_unit_topology == "mesh") {
+      m_mesh = true;
+      if (m_inter_unit_mesh_x <= 0 || m_stacks % m_inter_unit_mesh_x != 0) {
+        throw std::runtime_error(fmt::format("HBMStack: a mesh {} units wide does not tile {} stacks",
+                                             m_inter_unit_mesh_x, m_stacks));
+      }
+    } else if (m_inter_unit_topology != "full") {
+      throw std::runtime_error("HBMStack: inter_unit_topology must be full or mesh");
     }
     if (m_cores_per_stack <= 0) {
       throw std::runtime_error("HBMStack: cores_per_stack must be positive");
@@ -212,6 +232,7 @@ class HBMStackMemorySystem final : public IMemorySystem, public Implementation {
     m_stats.add("host_stack_link_ticks", m_stack_link_ticks);
     m_stats.add("inter_unit_bytes", s_inter_unit_bytes);
     m_stats.add("inter_unit_queue_ticks", s_inter_unit_queue_ticks);
+    m_stats.add("inter_unit_hops", s_inter_unit_hops);
     m_stats.add("inter_unit_latency_ticks", m_inter_unit_ticks);
     m_stats.add("requests_per_channel", s_requests_per_channel);
     m_stats.add("host_phy_ticks", m_host_phy_ticks);
@@ -269,16 +290,33 @@ class HBMStackMemorySystem final : public IMemorySystem, public Implementation {
           s_pim_local_requests++;
         }
       } else if (m_link_model) {
-        // Explicit inter-unit link: fixed traversal latency, and the payload occupies the link, so later
-        // transfers queue behind it. delay_ticks is one traversal; the code below charges it on the way in and
-        // again on the way out, which is the round trip.
-        size_t dir = static_cast<size_t>(src_stack) * m_stacks + dst_stack;
-        Clk_t ready = std::max(m_clk, m_link_free[dir]);
+        // Explicit inter-unit links: each traversal has a fixed latency, and the payload occupies the link, so later
+        // transfers queue behind it. Fully connected, that is one link; on a mesh, every hop of the X-then-Y route
+        // is one link. delay_ticks is the one-way trip; the code below charges it on the way in and again on the
+        // way out, which is the round trip (occupancy is taken on the way in only, as before).
         Clk_t occupancy = static_cast<Clk_t>(std::ceil(req.size_bytes / m_bytes_per_tick));
-        m_link_free[dir] = ready + occupancy;
-        txn->delay_ticks = m_inter_unit_ticks + static_cast<int>(ready - m_clk);
+        Clk_t t = m_clk, queued = 0;
+        int hops = 0;
+        auto traverse = [&](int from, int to) {
+          size_t dir = static_cast<size_t>(from) * m_stacks + to;
+          Clk_t ready = std::max(t, m_link_free[dir]);
+          queued += ready - t;
+          m_link_free[dir] = ready + occupancy;
+          t = ready + m_inter_unit_ticks;
+          hops++;
+        };
+        if (!m_mesh) {
+          traverse(src_stack, dst_stack);
+        } else {
+          int w = m_inter_unit_mesh_x, x = src_stack % w, y = src_stack / w;
+          int dx = dst_stack % w, dy = dst_stack / w, cur = src_stack;
+          while (x != dx) { x += (dx > x) ? 1 : -1; int next = y * w + x; traverse(cur, next); cur = next; }
+          while (y != dy) { y += (dy > y) ? 1 : -1; int next = y * w + x; traverse(cur, next); cur = next; }
+        }
+        txn->delay_ticks = static_cast<int>(t - m_clk);
         s_inter_unit_bytes += req.size_bytes;
-        s_inter_unit_queue_ticks += ready - m_clk;
+        s_inter_unit_queue_ticks += queued;
+        s_inter_unit_hops += hops;
         s_pim_remote_stack_requests++;
       } else {
         // No base-die path off the stack, so this goes out through the host (modelling choice).
